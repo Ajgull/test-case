@@ -3,6 +3,7 @@ import requests
 import time
 import re
 import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 def is_valid_url(urls: list) -> bool:
@@ -70,8 +71,9 @@ def test_host(host: str, count: int) -> dict:
     for i in range(count):
         try:
             start_time = time.time()
-            response = requests.get(host)
+            response = requests.get(host, timeout=10)
             end_time = time.time()
+            # time.sleep(5)
             if 200 <= response.status_code < 400:
                 success_count += 1
             else:
@@ -84,9 +86,9 @@ def test_host(host: str, count: int) -> dict:
             error_count += 1
 
     if time_of_requests:
-        min_time = min(time_of_requests)
-        max_time = max(time_of_requests)
-        avg_time = sum(time_of_requests) / len(time_of_requests)
+        min_time = round(min(time_of_requests), 3)
+        max_time = round(max(time_of_requests), 3)
+        avg_time = round(sum(time_of_requests) / len(time_of_requests), 3)
     else:
         min_time = max_time = avg_time = 0
 
@@ -102,6 +104,8 @@ def test_host(host: str, count: int) -> dict:
 
 
 def main():
+    parallel_version = True
+
     parser = argparse.ArgumentParser(description="HTTP-server tester")
 
     parser.add_argument(
@@ -122,9 +126,10 @@ def main():
     )
 
     args = parser.parse_args()
+    count = args.count
     hosts = []
 
-    if not is_positive_int_value(str(args.count)):
+    if not is_positive_int_value(str(count)):
         parser.error('Wrong number of requests. It must be positive and integer')
 
     if args.hosts:
@@ -136,18 +141,37 @@ def main():
         parser.error('Invalid type of host')
 
     results = []
-
-    for host in hosts:
-        print(f"Testing host: {host} with {args.count} requests")
-        statistics = test_host(host, args.count)
-        results.append(statistics)
-
-    report_text = format_statistics(results)
-
-    if args.out:
-        load_statistics_to_file(args.out, report_text)
-    else:
+    if parallel_version:
+        print('parallel version')
+        start = time.time()
+        max_workers = min(10, len(hosts))
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(test_host, host, count) for host in hosts}
+            for future in as_completed(futures):
+                result = future.result()
+                results.append(result)
+        end = time.time()
+        report_text = format_statistics(results)
         print(report_text)
+        print(f'total operating time of the program {end - start}')
+    if True:
+        print('linear version')
+        results.clear()
+        start = time.time()
+        for host in hosts:
+            statistics = test_host(host, count)
+            results.append(statistics)
+        end = time.time()
+        report_text = format_statistics(results)
+        print(report_text)
+        print(f'total operating time of the program {end - start}')
+
+    # report_text = format_statistics(results)
+    #
+    # if args.out:
+    #     load_statistics_to_file(args.out, report_text)
+    # else:
+    #     print(report_text)
 
 
 if __name__ == "__main__":
