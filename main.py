@@ -3,7 +3,6 @@ import requests
 import time
 import re
 import sys
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 def valid_urls(urls: list) -> list:
@@ -77,7 +76,7 @@ def test_host(host: str, count: int) -> dict:
 
             time_of_requests.append(round((end_time - start_time) * 1000, 3))
 
-        except requests.HTTPError as e:
+        except requests.exceptions.RequestException as e:
             print(f'Connection to host {host} {str(e)}')
             error_count += 1
 
@@ -153,7 +152,6 @@ def main():
         statistics = test_host(host, count)
         results.append(statistics)
     end = time.time()
-    print(f'total operating time of the program {end - start}')
 
     report_text = format_statistics(results)
 

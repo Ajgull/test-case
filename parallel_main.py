@@ -77,7 +77,8 @@ def test_host(host: str, count: int) -> dict:
 
             time_of_requests.append(round((end_time - start_time) * 1000, 3))
 
-        except requests.HTTPError as e:
+
+        except requests.exceptions.RequestException as e:
             print(f'Connection to host {host} {str(e)}')
             error_count += 1
 
