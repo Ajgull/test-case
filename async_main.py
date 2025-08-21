@@ -1,9 +1,9 @@
 import argparse
-import requests
 import time
 import re
 import sys
-from concurrent.futures import ProcessPoolExecutor, as_completed
+import aiohttp
+import asyncio
 
 
 def valid_urls(urls: list) -> list:
@@ -59,27 +59,28 @@ def format_statistics(data: list) -> str:
     return '\n'.join(lines)
 
 
-def test_host(host: str, count: int) -> dict:
+async def fetch(host: str, count: int) -> dict:
     success_count = 0
     fail_count = 0
     error_count = 0
     time_of_requests = []
 
-    for i in range(count):
-        try:
-            start_time = time.time()
-            response = requests.get(host, timeout=10)
-            end_time = time.time()
-            if 200 <= response.status_code < 400:
-                success_count += 1
-            else:
-                fail_count += 1
+    async with aiohttp.ClientSession(host) as session:
+        for _ in range(count):
+            try:
+                start_time = time.time()
+                async with session.get(host) as response:
+                    await response.text()
+                end_time = time.time()
+                if 200 <= response.status < 400:
+                    success_count += 1
+                else:
+                    fail_count += 1
 
-            time_of_requests.append(round((end_time - start_time) * 1000, 3))
-
-        except requests.HTTPError as e:
-            print(f'Connection to host {host} {str(e)}')
-            error_count += 1
+                time_of_requests.append(round((end_time - start_time) * 1000, 3))
+            except aiohttp.ClientError as e:
+                print(f'Connection to host {host} {str(e)}')
+                error_count += 1
 
     if time_of_requests:
         min_time = round(min(time_of_requests), 3)
@@ -99,7 +100,7 @@ def test_host(host: str, count: int) -> dict:
     }
 
 
-def main():
+async def main():
     parser = argparse.ArgumentParser(description="HTTP-server tester\n"
                                                  "–H/--hosts hosts separated by commas without spaces\n"
                                                  "–C/--count number of requests\n"
@@ -134,7 +135,6 @@ def main():
     if not is_positive_int_value(count):
         parser.error('Wrong number of requests. It must be positive and integer')
 
-
     if args.hosts:
         hosts = args.hosts.split(',')
     elif args.file:
@@ -145,15 +145,12 @@ def main():
     if not hosts:
         parser.error('Invalid type of host')
 
-    results = []
+    print('async version')
 
-    print('linear version')
+    tasks = [fetch(host, count) for host in hosts]
     start = time.time()
-    for host in hosts:
-        statistics = test_host(host, count)
-        results.append(statistics)
+    results = await asyncio.gather(*tasks)
     end = time.time()
-    print(f'total operating time of the program {end - start}')
 
     report_text = format_statistics(results)
 
@@ -166,4 +163,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

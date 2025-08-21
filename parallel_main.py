@@ -146,14 +146,15 @@ def main():
         parser.error('Invalid type of host')
 
     results = []
-
-    print('linear version')
+    print('parallel version')
     start = time.time()
-    for host in hosts:
-        statistics = test_host(host, count)
-        results.append(statistics)
+    max_workers = min(10, len(hosts))
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = {executor.submit(test_host, host, count) for host in hosts}
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
     end = time.time()
-    print(f'total operating time of the program {end - start}')
 
     report_text = format_statistics(results)
 

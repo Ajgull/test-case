@@ -1,16 +1,16 @@
   Host: https://ya.ru
-  Successes: 5
+  Successes: 2
   Failed: 0
   Errors: 0
-  Min: 146.726 ms
-  Max: 301.32 ms
-  Avg: 196.1062 ms
+  Min: 136.482 ms
+  Max: 199.408 ms
+  Avg: 167.945 ms
 ========================================
   Host: https://google.com
-  Successes: 5
+  Successes: 2
   Failed: 0
   Errors: 0
-  Min: 450.041 ms
-  Max: 475.07 ms
-  Avg: 464.371 ms
+  Min: 569.171 ms
+  Max: 627.421 ms
+  Avg: 598.296 ms
 ========================================
