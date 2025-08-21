@@ -6,43 +6,41 @@ import sys
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
-def is_valid_url(urls: list) -> bool:
+def valid_urls(urls: list) -> list:
     url_pattern = re.compile(
         r'^(?:http|ftp)s?://'
         r'(([A-Za-z0-9-]+\.)+[A-Za-z]{2,6})'
     )
-    return all(bool(url_pattern.match(url)) for url in urls)
+    print([url for url in urls if url_pattern.fullmatch(url)])
+    return [url for url in urls if url_pattern.fullmatch(url)]
 
 
-def is_positive_int_value(value: str) -> bool:
-    digit_pattern = re.compile(
-        r'^[1-9]\d*$'
-    )
-    return bool(digit_pattern.match(value))
+def is_positive_int_value(value) -> bool:
+    try:
+        int_val = int(value)
+        return int_val > 0
+    except ValueError:
+        print('Input count is not int or positive')
+        return False
 
 
-def load_hosts_from_file(filename) -> list:
-    hosts = []
-
+def load_hosts_from_file(filename: str) -> list:
     try:
         with open(filename, 'r', encoding='UTF-8') as file_in:
             lines = file_in.readlines()
-            lines = [line.strip() for line in lines if line.strip()]
-            if not is_valid_url(lines):
-                print(f'Error format of host {lines} in file {filename}')
-                sys.exit(1)
-            hosts.extend(lines)
+            lines = [line.strip() for line in lines]
     except FileNotFoundError as e:
         print(f'Error while loading data from file {filename}')
         sys.exit(1)
-
-    return hosts
+    return lines
 
 
 def load_statistics_to_file(filename: str, data: str) -> None:
     try:
         with open(filename, 'w', encoding='UTF-8') as file_out:
             file_out.write(data)
+    except IOError:
+        print(f'Output error when working with a {filename}')
     except Exception as e:
         print(f'Error of work with file, {str(e)}')
         sys.exit(1)
@@ -73,7 +71,6 @@ def test_host(host: str, count: int) -> dict:
             start_time = time.time()
             response = requests.get(host, timeout=10)
             end_time = time.time()
-            # time.sleep(5)
             if 200 <= response.status_code < 400:
                 success_count += 1
             else:
@@ -129,7 +126,7 @@ def main():
     count = args.count
     hosts = []
 
-    if not is_positive_int_value(str(count)):
+    if not is_positive_int_value(count):
         parser.error('Wrong number of requests. It must be positive and integer')
 
     if args.hosts:
@@ -137,7 +134,9 @@ def main():
     elif args.file:
         hosts = load_hosts_from_file(args.file)
 
-    if not is_valid_url(hosts):
+    hosts=valid_urls(hosts)
+
+    if not hosts:
         parser.error('Invalid type of host')
 
     results = []
@@ -151,12 +150,9 @@ def main():
                 result = future.result()
                 results.append(result)
         end = time.time()
-        report_text = format_statistics(results)
-        print(report_text)
         print(f'total operating time of the program {end - start}')
-    if True:
+    else:
         print('linear version')
-        results.clear()
         start = time.time()
         for host in hosts:
             statistics = test_host(host, count)
@@ -166,12 +162,12 @@ def main():
         print(report_text)
         print(f'total operating time of the program {end - start}')
 
-    # report_text = format_statistics(results)
-    #
-    # if args.out:
-    #     load_statistics_to_file(args.out, report_text)
-    # else:
-    #     print(report_text)
+    report_text = format_statistics(results)
+
+    if args.out:
+        load_statistics_to_file(args.out, report_text)
+    else:
+        print(report_text)
 
 
 if __name__ == "__main__":
