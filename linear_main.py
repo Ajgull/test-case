@@ -1,10 +1,9 @@
 import requests
 import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
 import utils
 
 
-def parallel_test_host(host: str, count: int) -> dict:
+def linear_test_host(host: str, count: int) -> dict:
     success_count = 0
     fail_count = 0
     error_count = 0
@@ -21,7 +20,6 @@ def parallel_test_host(host: str, count: int) -> dict:
                 fail_count += 1
 
             time_of_requests.append(round((end_time - start_time) * 1000, 3))
-
 
         except requests.exceptions.RequestException as e:
             print(f'Connection to host {host} {str(e)}')
@@ -44,16 +42,14 @@ def parallel_test_host(host: str, count: int) -> dict:
         'Avg': avg_time
     }
 
-def parallel_test(hosts: list, count: int) -> tuple:
+
+def linear_test(hosts: list, count: int) -> tuple:
     results = []
-    print('parallel version')
+    print('linear version')
     start = time.time()
-    max_workers = min(10, len(hosts))
-    with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(parallel_test_host, host, count) for host in hosts}
-        for future in as_completed(futures):
-            result = future.result()
-            results.append(result)
+    for host in hosts:
+        statistics = linear_test_host(host, count)
+        results.append(statistics)
     end = time.time()
 
     report_text = utils.format_statistics(results)

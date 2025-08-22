@@ -1,62 +1,7 @@
-import argparse
 import time
-import re
-import sys
 import aiohttp
 import asyncio
-
-
-def valid_urls(urls: list) -> list:
-    url_pattern = re.compile(
-        r'^(?:http|ftp)s?://'
-        r'(([A-Za-z0-9-]+\.)+[A-Za-z]{2,6})'
-    )
-    return [url for url in urls if url_pattern.fullmatch(url)]
-
-
-def is_positive_int_value(value) -> bool:
-    try:
-        int_val = int(value)
-        return int_val > 0
-    except ValueError:
-        print('Input count is not int or positive')
-        return False
-
-
-def load_hosts_from_file(filename: str) -> list:
-    try:
-        with open(filename, 'r', encoding='UTF-8') as file_in:
-            lines = file_in.readlines()
-            lines = [line.strip() for line in lines]
-    except FileNotFoundError as e:
-        print(f'Error while loading data from file {filename}')
-        sys.exit(1)
-    return lines
-
-
-def load_statistics_to_file(filename: str, data: str) -> None:
-    try:
-        with open(filename, 'w', encoding='UTF-8') as file_out:
-            file_out.write(data)
-    except IOError:
-        print(f'Output error when working with a {filename}')
-    except Exception as e:
-        print(f'Error of work with file, {str(e)}')
-        sys.exit(1)
-
-
-def format_statistics(data: list) -> str:
-    lines = []
-    for item in data:
-        lines.append(f"  Host: {item['Host']}")
-        lines.append(f"  Successes: {item['Success']}")
-        lines.append(f"  Failed: {item['Failed']}")
-        lines.append(f"  Errors: {item['Errors']}")
-        lines.append(f"  Min: {item['Min']} ms")
-        lines.append(f"  Max: {item['Max']} ms")
-        lines.append(f"  Avg: {item['Avg']} ms")
-        lines.append('=' * 40)
-    return '\n'.join(lines)
+import utils
 
 
 async def fetch(host: str, count: int) -> dict:
@@ -65,7 +10,7 @@ async def fetch(host: str, count: int) -> dict:
     error_count = 0
     time_of_requests = []
 
-    async with aiohttp.ClientSession(host) as session:
+    async with aiohttp.ClientSession() as session:
         for _ in range(count):
             try:
                 start_time = time.time()
@@ -100,51 +45,7 @@ async def fetch(host: str, count: int) -> dict:
     }
 
 
-async def main():
-    parser = argparse.ArgumentParser(description="HTTP-server tester\n"
-                                                 "–H/--hosts hosts separated by commas without spaces\n"
-                                                 "–C/--count number of requests\n"
-                                                 "–F/--file name of file to read hosts, each from a new line\n"
-                                                 "–O/--output name of file for uploading results")
-
-    parser.add_argument(
-        "-H", "--hosts", required=False,
-        help="Write the host"
-    )
-    parser.add_argument(
-        "-C", "--count", type=int, default=1, required=True,
-        help="Write count of requests"
-    )
-    parser.add_argument(
-        "-F", "--file", type=str, required=False,
-        help="Write name of in_file"
-    )
-    parser.add_argument(
-        "-O", "--out", type=str, required=False,
-        help="Write name of out_file"
-    )
-
-    args = parser.parse_args()
-    count = args.count
-    hosts = []
-
-    if args.hosts and args.file:
-        print('Impossible to run program with -F and -H keys')
-        sys.exit(1)
-
-    if not is_positive_int_value(count):
-        parser.error('Wrong number of requests. It must be positive and integer')
-
-    if args.hosts:
-        hosts = args.hosts.split(',')
-    elif args.file:
-        hosts = load_hosts_from_file(args.file)
-
-    hosts = valid_urls(hosts)
-
-    if not hosts:
-        parser.error('Invalid type of host')
-
+async def async_test(hosts: list, count: int) -> tuple:
     print('async version')
 
     tasks = [fetch(host, count) for host in hosts]
@@ -152,15 +53,7 @@ async def main():
     results = await asyncio.gather(*tasks)
     end = time.time()
 
-    report_text = format_statistics(results)
+    report_text = utils.format_statistics(results)
+    total_time = end - start
 
-    if args.out:
-        load_statistics_to_file(args.out, report_text)
-    else:
-        print(report_text)
-
-    print(f'total operating time of the program {end - start}')
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    return report_text, total_time

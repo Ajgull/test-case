@@ -2,15 +2,15 @@
   Successes: 2
   Failed: 0
   Errors: 0
-  Min: 136.482 ms
-  Max: 199.408 ms
-  Avg: 167.945 ms
+  Min: 74.388 ms
+  Max: 225.536 ms
+  Avg: 149.962 ms
 ========================================
   Host: https://google.com
   Successes: 2
   Failed: 0
   Errors: 0
-  Min: 569.171 ms
-  Max: 627.421 ms
-  Avg: 598.296 ms
+  Min: 206.12 ms
+  Max: 594.905 ms
+  Avg: 400.512 ms
 ========================================

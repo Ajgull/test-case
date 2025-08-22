@@ -1,101 +1,10 @@
 import argparse
-import requests
-import time
-import re
 import sys
-
-
-def valid_urls(urls: list) -> list:
-    url_pattern = re.compile(
-        r'^(?:http|ftp)s?://'
-        r'(([A-Za-z0-9-]+\.)+[A-Za-z]{2,6})'
-    )
-    return [url for url in urls if url_pattern.fullmatch(url)]
-
-
-def is_positive_int_value(value) -> bool:
-    try:
-        int_val = int(value)
-        return int_val > 0
-    except ValueError:
-        print('Input count is not int or positive')
-        return False
-
-
-def load_hosts_from_file(filename: str) -> list:
-    try:
-        with open(filename, 'r', encoding='UTF-8') as file_in:
-            lines = file_in.readlines()
-            lines = [line.strip() for line in lines]
-    except FileNotFoundError as e:
-        print(f'Error while loading data from file {filename}')
-        sys.exit(1)
-    return lines
-
-
-def load_statistics_to_file(filename: str, data: str) -> None:
-    try:
-        with open(filename, 'w', encoding='UTF-8') as file_out:
-            file_out.write(data)
-    except IOError:
-        print(f'Output error when working with a {filename}')
-    except Exception as e:
-        print(f'Error of work with file, {str(e)}')
-        sys.exit(1)
-
-
-def format_statistics(data: list) -> str:
-    lines = []
-    for item in data:
-        lines.append(f"  Host: {item['Host']}")
-        lines.append(f"  Successes: {item['Success']}")
-        lines.append(f"  Failed: {item['Failed']}")
-        lines.append(f"  Errors: {item['Errors']}")
-        lines.append(f"  Min: {item['Min']} ms")
-        lines.append(f"  Max: {item['Max']} ms")
-        lines.append(f"  Avg: {item['Avg']} ms")
-        lines.append('=' * 40)
-    return '\n'.join(lines)
-
-
-def test_host(host: str, count: int) -> dict:
-    success_count = 0
-    fail_count = 0
-    error_count = 0
-    time_of_requests = []
-
-    for i in range(count):
-        try:
-            start_time = time.time()
-            response = requests.get(host, timeout=10)
-            end_time = time.time()
-            if 200 <= response.status_code < 400:
-                success_count += 1
-            else:
-                fail_count += 1
-
-            time_of_requests.append(round((end_time - start_time) * 1000, 3))
-
-        except requests.exceptions.RequestException as e:
-            print(f'Connection to host {host} {str(e)}')
-            error_count += 1
-
-    if time_of_requests:
-        min_time = round(min(time_of_requests), 3)
-        max_time = round(max(time_of_requests), 3)
-        avg_time = round(sum(time_of_requests) / len(time_of_requests), 3)
-    else:
-        min_time = max_time = avg_time = 0
-
-    return {
-        'Host': host,
-        'Success': success_count,
-        'Failed': fail_count,
-        'Errors': error_count,
-        'Min': min_time,
-        'Max': max_time,
-        'Avg': avg_time
-    }
+import asyncio
+from linear_main import linear_test
+from parallel_main import parallel_test
+from async_main import async_test
+import utils
 
 
 def main():
@@ -103,7 +12,8 @@ def main():
                                                  "–H/--hosts hosts separated by commas without spaces\n"
                                                  "–C/--count number of requests\n"
                                                  "–F/--file name of file to read hosts, each from a new line\n"
-                                                 "–O/--output name of file for uploading results")
+                                                 "–O/--output name of file for uploading results\n"
+                                                 "-T/--type of program (l - linear, p - parallel, a - async")
 
     parser.add_argument(
         "-H", "--hosts", required=False,
@@ -122,6 +32,11 @@ def main():
         help="Write name of out_file"
     )
 
+    parser.add_argument(
+        "-T", "--type", type=str, required=True,
+        help="Write type of program to run (l - linear, p - parallel, a - async)"
+    )
+
     args = parser.parse_args()
     count = args.count
     hosts = []
@@ -130,37 +45,34 @@ def main():
         print('Impossible to run program with -F and -H keys')
         sys.exit(1)
 
-    if not is_positive_int_value(count):
+    if not utils.is_positive_int_value(count):
         parser.error('Wrong number of requests. It must be positive and integer')
-
 
     if args.hosts:
         hosts = args.hosts.split(',')
     elif args.file:
-        hosts = load_hosts_from_file(args.file)
+        hosts = utils.load_hosts_from_file(args.file)
 
-    hosts = valid_urls(hosts)
+    hosts = utils.valid_urls(hosts)
 
     if not hosts:
         parser.error('Invalid type of host')
 
-    results = []
-
-    print('linear version')
-    start = time.time()
-    for host in hosts:
-        statistics = test_host(host, count)
-        results.append(statistics)
-    end = time.time()
-
-    report_text = format_statistics(results)
+    if args.type == 'l':
+        report_text, total_time = linear_test(hosts, count)
+    elif args.type == 'p':
+        report_text, total_time = parallel_test(hosts, count)
+    elif args.type == 'a':
+        report_text, total_time = asyncio.run(async_test(hosts, count))
+    else:
+        raise ValueError('Invalid type of running program')
 
     if args.out:
-        load_statistics_to_file(args.out, report_text)
+        utils.load_statistics_to_file(args.out, report_text)
     else:
         print(report_text)
 
-    print(f'total operating time of the program {end - start}')
+    print(f'total operating time of the program {total_time}')
 
 
 if __name__ == "__main__":
